@@ -130,6 +130,7 @@ func Adsc(a model.Args) error {
 			IP:        util.GetIP(),
 			// TODO: multicluster
 			Cluster: "Kubernetes",
+			Meta:    a.AdsConfig.NodeMetadata,
 		})
 	}
 	return ExecuteSimulations(a, model.AggregateSimulation{Simulations: sims})

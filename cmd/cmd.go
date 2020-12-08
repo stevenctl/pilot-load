@@ -76,11 +76,7 @@ var rootCmd = &cobra.Command{
 		if kubeconfig == "" {
 			kubeconfig = filepath.Join(os.Getenv("HOME"), "/.kube/config")
 		}
-		config, err := readConfigFile(configFile)
-		if err != nil {
-			return fmt.Errorf("failed to read config file: %v", err)
-		}
-		config = config.ApplyDefaults()
+
 		if qps == 0 {
 			qps = 100
 		}
@@ -88,7 +84,6 @@ var rootCmd = &cobra.Command{
 			PilotAddress:      pilotAddress,
 			KubeConfig:        kubeconfig,
 			Qps:               qps,
-			ClusterConfig:     config,
 			AdsConfig:         adscConfig,
 			ImpersonateConfig: impersonateConfig,
 			ProberConfig:      proberConfig,
@@ -96,10 +91,20 @@ var rootCmd = &cobra.Command{
 
 		switch sim {
 		case "cluster":
+			config, err := readClusterConfigFile(configFile)
+			if err != nil {
+				return fmt.Errorf("failed to read config file: %v", err)
+			}
+			a.ClusterConfig = config.ApplyDefaults()
 			logConfig(a.ClusterConfig)
 			logClusterConfig(a.ClusterConfig)
 			return simulation.Cluster(a)
 		case "adsc":
+			if config, err := readAdscConfigFile(configFile); err == nil {
+				a.AdsConfig = config
+			} else {
+				return fmt.Errorf("failed to read config file %v", err)
+			}
 			logConfig(a.AdsConfig)
 			return simulation.Adsc(a)
 		case "impersonate":
@@ -142,7 +147,7 @@ var defaultConfig = model.ClusterConfig{
 	}},
 }
 
-func readConfigFile(filename string) (model.ClusterConfig, error) {
+func readClusterConfigFile(filename string) (model.ClusterConfig, error) {
 	if filename == "" {
 		return defaultConfig, nil
 	}
@@ -153,6 +158,21 @@ func readConfigFile(filename string) (model.ClusterConfig, error) {
 	config := model.ClusterConfig{}
 	if err := yaml.Unmarshal(bytes, &config); err != nil {
 		return config, fmt.Errorf("failed to unmarshall configFile: %v", err)
+	}
+	return config, err
+}
+
+func readAdscConfigFile(filename string) (model.AdscConfig, error) {
+	if filename == "" {
+		return model.AdscConfig{}, nil
+	}
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return model.AdscConfig{}, fmt.Errorf("failed to read configFile file: %v", filename)
+	}
+	config := model.AdscConfig{}
+	if err := yaml.Unmarshal(bytes, &config); err != nil {
+		return model.AdscConfig{}, fmt.Errorf("failed to unmarshall configFile: %v", err)
 	}
 	return config, err
 }

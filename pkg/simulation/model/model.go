@@ -136,7 +136,8 @@ func (c ClusterConfig) ApplyDefaults() ClusterConfig {
 }
 
 type AdscConfig struct {
-	Count int
+	Count        int                    `json:"count,omitempty"`
+	NodeMetadata map[string]interface{} `json:"nodeMetadata,omitempty"`
 }
 
 type Selector string

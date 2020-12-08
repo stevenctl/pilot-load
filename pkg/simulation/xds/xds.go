@@ -24,6 +24,8 @@ type Simulation struct {
 
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	Meta map[string]interface{}
 }
 
 func (x *Simulation) Run(ctx model.Context) error {
@@ -41,6 +43,11 @@ func (x *Simulation) Run(ctx model.Context) error {
 		"NAMESPACE":     x.Namespace,
 		"SDS":           "true",
 	}
+
+	for k, v := range x.Meta {
+		meta[k] = v
+	}
+
 	go func() {
 		adsc.Connect(ctx.Args.PilotAddress, &adsc.Config{
 			Namespace: x.Namespace,
