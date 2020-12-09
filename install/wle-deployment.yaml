@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: we-auto-reg-load
+  labels:
+    app: we-auto-reg-load
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: we-auto-reg-load
+      annotations:
+        sidecar.istio.io/inject: "false"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8765"
+      labels:
+        app: we-auto-reg-load
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                namespaces: [istio-system]
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - istiod
+                topologyKey: kubernetes.io/hostname
+      # May take a while to shut down
+      terminationGracePeriodSeconds: 2000
+      containers:
+        - name: pilot-load
+          image: slandow/pilot-load
+          imagePullPolicy: Always
+          args:
+            - "adsc"
+            - "--pilot-address=istiod.istio-system:15010"
+            - "--qps=500"
+            - "--config"
+            - "/etc/config/config.yaml"
+          resources:
+            requests:
+              cpu: 3000m
+              memory: 4Gi
+          volumeMounts:
+            - name: testconfig
+              mountPath: /etc/config/
+      volumes:
+        - name: testconfig
+          configMap:
+            name: pilot-load-config
+  selector:
+    matchLabels:
+      app: we-auto-reg-load
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pilot-load-config
+data:
+  config.yaml: |
+    count: 2500
+    nodeMetadata:
+      AUTO_REGISTER_GROUP: wg-load
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  name: wg-load
+spec:
+  metadata:
+    annotations: {}
+    labels: {}
+  template:
+    ports: {}
+    serviceAccount: default
