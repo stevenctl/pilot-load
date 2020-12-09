@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -23,6 +24,7 @@ var (
 	configFile        = ""
 	loggingOptions    = defaultLogOptions()
 	adscConfig        = model.AdscConfig{}
+	nodeMetadata      = []string{}
 	impersonateConfig = model.ImpersonateConfig{
 		Replicas: 1,
 		Selector: string(model.SidecarSelector),
@@ -40,6 +42,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&qps, "qps", qps, "qps for kube client")
 
 	rootCmd.PersistentFlags().IntVar(&adscConfig.Count, "adsc.count", adscConfig.Count, "number of adsc connections to make")
+	rootCmd.PersistentFlags().StringSliceVar(&nodeMetadata, "meta", []string{}, "node metadata values in the pair KEY=value. No need to prepend ISTIO_META.")
 
 	rootCmd.PersistentFlags().DurationVar(&impersonateConfig.Delay, "impersonate.delay", impersonateConfig.Delay, "delay between each connection")
 	rootCmd.PersistentFlags().IntVar(&impersonateConfig.Replicas, "impersonate.replicas", impersonateConfig.Replicas, "number of connections to make for each pod")
@@ -96,6 +99,7 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("failed to read config file: %v", err)
 			}
 			a.ClusterConfig = config.ApplyDefaults()
+			applyMetaOverrides(a.ClusterConfig.NodeMetadata)
 			logConfig(a.ClusterConfig)
 			logClusterConfig(a.ClusterConfig)
 			return simulation.Cluster(a)
@@ -105,6 +109,10 @@ var rootCmd = &cobra.Command{
 			} else {
 				return fmt.Errorf("failed to read config file %v", err)
 			}
+			if a.AdsConfig.NodeMetadata == nil {
+				a.AdsConfig.NodeMetadata = map[string]interface{}{}
+			}
+			applyMetaOverrides(a.AdsConfig.NodeMetadata)
 			logConfig(a.AdsConfig)
 			return simulation.Adsc(a)
 		case "impersonate":
@@ -119,6 +127,16 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("unknown simulation %v. Expected: {cluster, adsc, impersonate, prober}", sim)
 		}
 	},
+}
+
+func applyMetaOverrides(meta map[string]interface{}) {
+	for _, arg := range nodeMetadata {
+		p := strings.Split(arg, "=")
+		if len(p) != 2 {
+			log.Infof("meta arg %s is in the incorrect format", arg)
+		}
+		meta[p[0]] = p[1]
+	}
 }
 
 func logConfig(config interface{}) {

@@ -132,6 +132,7 @@ func (c ClusterConfig) ApplyDefaults() ClusterConfig {
 		}
 		ret.Namespaces[n] = ns
 	}
+	ret.NodeMetadata = map[string]interface{}{}
 	return *ret
 }
 
